@@ -86,6 +86,7 @@ def null_value_count(df):
 	null_columns_counts = []
 	numRows = df.count()
 	for k in df.columns:
+		#Number of missing values:
 		nullRows = df.where(col(k).isNull()).count()
 		if(nullRows > 0):
 			temp = k, nullRows
@@ -94,7 +95,71 @@ def null_value_count(df):
 
 null_value_count(titanic_df)
 
+#####
+#specify the columns:
+spark.createDataFrame(null_value_count(titanic_df), ['Column_with_null_value', 'Null_values_count']).show()
+mean_age = titanic_df.select(mean('Age')).collect()[0][0]
+
+#####
+#Create another column:
+titanic_df = titanic_df.withColumn('Initial', regexp_extract(col('Name'), '([A-Za-z]+)\.', 1))
+
+titanic_df.select('Initial').distinct().show()
+##replace,
+# withColumn, select,
+# createDataFrame, groupBy, 
+#printSchema, sparkContext, 
+#collect(), filter
+#when(Condition1, 0).otherwise(columns)
+titanic_df = titanic_df.replace(['Mlle','Mme', 'Ms', 'Dr','Major','Lady','Countess','Jonkheer','Col','Rev','Capt','Sir','Don'],
+               ['Miss','Miss','Miss','Mr','Mr',  'Mrs',  'Mrs',  'Other',  'Other','Other','Mr','Mr','Mr'])
 
 
+titanic_df.groupby('Initial').avg('Age').collect()
 
+#Perform another training model:
+titanic_df = titanic_df.withColumn("Age",when((titanic_df["Initial"] == "Miss") & (titanic_df["Age"].isNull()), 22).otherwise(titanic_df["Age"]))
+titanic_df = titanic_df.withColumn("Age",when((titanic_df["Initial"] == "Other") & (titanic_df["Age"].isNull()), 46).otherwise(titanic_df["Age"]))
+titanic_df = titanic_df.withColumn("Age",when((titanic_df["Initial"] == "Master") & (titanic_df["Age"].isNull()), 5).otherwise(titanic_df["Age"]))
+titanic_df = titanic_df.withColumn("Age",when((titanic_df["Initial"] == "Mr") & (titanic_df["Age"].isNull()), 33).otherwise(titanic_df["Age"]))
+titanic_df = titanic_df.withColumn("Age",when((titanic_df["Initial"] == "Mrs") & (titanic_df["Age"].isNull()), 36).otherwise(titanic_df["Age"]))
+
+#Check the imputation:
+titanic_df.filter(titanic_df.Age == 46).select('Initial').show()
+titanic_df.select('Age').show()
+titanic_df.groupBy('Embarked').count().show()
+
+#Fill the NA:
+titanic_df = titanic_df.na.fill({'Embarked': 'S'})
+titanic_df = titanic_df.drop('Cabin')
+titanic_df = titanic_df.withColumn('Family_Size', col('SibSp') + col('Parch'))
+titanic_df.groupBy('Family_Size').count().show()
+
+titanic_df = titanic_df.withColumn('Alone', lit(0))
+titanic_df = titanic_df.withColumn('Alone', when(titanic_df['Family_Size'] == 0, 1).otherwise(titanic_df['Alone']))
+#####
+#Transform, estimator, pipeline.
+#pipeline.fit().transform()
+#label encoding:
+indexes = [StringIndexer(inputCol = column, outputCol = column + '_index').fit(titanic_df) for column in ['Sex', 'Embarked', 'Initial']]
+pipeline = Pipeline(stages = indexes)
+titanic_df = pipeline.fit(titanic_df).transform(titanic_df)
+titanic_df.show(3)
+
+titanic_df = titanic_df.drop('PassengerId', 'Name', 'Ticket', 'Cabin', 'Embarked', 'Sex', 'Initial')
+titanic_df.show(5)
+
+feature = VectorAssembler(inputCols=titanic_df.columns[1:],outputCol="features")
+feature_vector= feature.transform(titanic_df)
+feature_vector.show(5)
+#Run a simple Naive Bayes algorithm:
+#split the training and test set:
+(trainingData, testData) = feature_vector.randomSplit([0.8, 0.2],seed = 11)
+from pyspark.ml.classification import LogisticRegression
+lr = LogisticRegression(labelCol = 'Survived', featuresCol = 'features')
+lr_model = lr.fit(training_data)
+lr_prediction = lr_model.transform(test_data)
+lr_prediction.select('prediction', 'Survived', 'features').show()
+#Performing the ml tuning:
+evaluator = MulticlassClassificationEvaluator(labelCol = 'Survived',)
 
