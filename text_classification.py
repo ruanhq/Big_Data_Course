@@ -28,17 +28,19 @@ from pyspark.sql import SparkSession
 from pyspark import SparkContext
 
 #Starting a spark session:
+#Building a spark context:
 spark = SparkSession \
-.builder.appName('Toxic Comment Classification')
-                  .enableHiveSupport()
-                  .config("spark.executor.memory", "4G")
-                  .config("spark.driver.memory","18G")
-                  .config("spark.executor.cores","7")
-                  .config("spark.python.worker.memory","4G")
-                  .config("spark.driver.maxResultSize","0")
-                  .config("spark.sql.crossJoin.enabled", "true")
-                  .config("spark.serializer","org.apache.spark.serializer.KryoSerializer")
-                  .config("spark.default.parallelism","2").getOrCreate()
+.builder.appName('Toxic Comment Classification') \
+.enableHiveSupport() \
+.config('spark.executor.memory') \
+.config('spark.driver.memory', '18G') \
+.config('spark.python.worker.memory', '4G') \
+.config('spark.sql.crossJoin.enabled', 'true') \
+.config('spark.serializer', 'org.apache.spark.serializer.KryoSerializer') \
+.config('spark.default.parallelism', '4') \
+.getOrCreate()
+
+
 
 train_df = pd.read_csv('trains.csv')
 train_df.fillna('', inplace = True)
