@@ -163,3 +163,86 @@ lr_prediction.select('prediction', 'Survived', 'features').show()
 #Performing the ml tuning:
 evaluator = MulticlassClassificationEvaluator(labelCol = 'Survived',)
 
+
+
+
+
+#Performing feature engineering by apache spark:
+from pyspark.sql.functions import avg
+
+bureau = spark.read.csv('bureau.csv', header = 'True', inferSchema = 'True')
+#display(bureau.where('SK_ID_CURR = 100001'))
+
+bureau.printSchema()
+bureau_10000 = bureau.limit(10000)
+loans_per_customer = bureau_10000.select('SK_ID_CURR', 'DAYS_CREDIT').groupBy('SK_ID_CURR').count().withColumnRenamed("count", "BUREAU_LOAN_COUNT")
+bureau_10000 = bureau_10000.join(loans_per_customer, ['SK_ID_CURR'], how = 'left')
+print((bureau_10000.count(), len(bureau_10000.columns)))
+#display(bureau_10000)
+#Number of types of past loans:
+loans_type_per_customer = 
+
+
+
+
+
+
+
+
+
+########
+#Using spark to perform the nlp task:
+from pyspark.ml import Pipeline 
+from pyspark.ml.feature import CountVectorizer, StringIndexer, RegexTokenizer, StopWordsRemover
+from pyspark.sql.functions import col, udf, regexp_replace, isnull
+from pyspark.sql.types import StringType, IntegerType
+from pyspark.ml.classification import 
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+
+
+news_data = spark.read.csv('uci-news-aggregator.csv', header = 'True', inferSchema = 'True')
+news_data.count()
+
+def null_value_count(df):
+	null_columns_counts = []
+	numRows = df.count()
+	for k in df.columns:
+		nullRows = df.where(col(k).isNull()).count()
+		if(nullRows > 0):
+			temp = k, nullRows
+			null_columns_count.append(temp)
+	return null_value_count
+
+#createDataFrame!
+missing_count = spark.createDataFrame(null_value_count(news_data), ['Coulmn_with_Null_Value', 'Null_values_count']).show()
+#
+title_category = news_data.select('TITLE', 'CATEGORY')
+
+title_category.select('Category').distinct().count()
+title_category.groupBy('Category').count().orderBy(col('Count').desc()).show(truncate = False)
+title_category.groupBy('TITLE').count().orderBy(col('count').desc()).show(truncate = False)
+####
+#Top 20 news categories:
+#regexp_replace: regular expression replacing!
+title_category = title_category.withColumn('only_str', regexp_replace(col('TITLE'), '\d+', ''))
+title_category.select('TITLE', 'only_str').show(truncate = False)
+
+#Top 20 news title:
+regex_tokenizer = RegexTokenizer(inputCol = 'only_str', outputCol = 'words', pattern = '\\W')
+raw_words = regex_tokenizer.transform(title_category)
+raw_words.show()
+
+
+remover = StopWordsRemover(inputCol = 'words', outputCol = 'filtered')
+word_df = remover.transform(raw_words)
+word_df.select('words', 'filtered').show(truncate = False)
+indexer = StringIndexer(inputCol = 'CATEGORY', outputCol = 'categoryIndex')
+feature_data = indexer.fit(word_df).transform(word_df)
+feature_data.show()
+
+
+cv = CountVectorizer(inputCol = 'filtered', outputCol = 'features')
+
+
+
+
