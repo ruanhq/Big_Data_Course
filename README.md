@@ -4,3 +4,4 @@
 3. MongoDB - The Complete Developer's Guide
 4. Hive learning
 5. Scala Machine learning model fitting
+6. ETL/Streaming Computing
